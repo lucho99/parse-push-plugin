@@ -45,9 +45,9 @@
 
         <source-file src="src/android/parse/Parse-1.10.1.jar" target-dir="libs" framework="true" />
         <source-file src="src/android/parse/bolts-android-1.2.1.jar" target-dir="libs" framework="true" />
-		<source-file src="src/android/parse/android-support-v4.jar" target-dir="libs" framework="true" />
+		    <source-file src="src/android/parse/android-support-v4.jar" target-dir="libs" framework="true" />
         <source-file src="src/android/ParsePushPlugin.java" target-dir="src/com/phonegap/parsepushplugin" />
-        <source-file src="src/android/ParsePushPluginReceiver.java" target-dir="src/com/phonegap/parsepushplugin" />      
+        <source-file src="src/android/ParsePushPluginReceiver.java" target-dir="src/com/phonegap/parsepushplugin" />
      </platform>
 
     <platform name="ios">
@@ -59,8 +59,6 @@
         <header-file src="src/ios/CDVParsePlugin.h" />
         <source-file src="src/ios/CDVParsePlugin.m" />
 
-        <!--<framework src="AssetsLibrary.framework" />-->
-        <!--<framework src="MobileCoreServices.framework" />-->
         <framework src="AudioToolbox.framework" />
         <framework src="CFNetwork.framework" />
         <framework src="CoreGraphics.framework" />

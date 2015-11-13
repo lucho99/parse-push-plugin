@@ -11,16 +11,65 @@
 
 @synthesize callbackId;
 @synthesize notificationCallbackId;
-@synthesize callback;
 
-/*- (void)initialize: (CDVInvokedUrlCommand*)command
+- (void)registerCallback:(CDVInvokedUrlCommand*)command;
 {
-    CDVPluginResult* pluginResult = nil;
-    NSString *appId = [command.arguments objectAtIndex:0];
-    NSString *clientKey = [command.arguments objectAtIndex:1];
-    [Parse setApplicationId:appId clientKey:clientKey];
-    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    self.notificationCallbackId = command.callbackId;
+    [self successWithMessage:@"registerCallback"];
+}
+
+- (void)initialize:(CDVInvokedUrlCommand*)command;
+{
+    [self.commandDelegate runInBackground:^ {
+        
+        NSLog(@"Push Plugin register called");
+        self.callbackId = command.callbackId;
+        
+        NSString *appId = [command.arguments objectAtIndex:0];
+        NSString *clientKey = [command.arguments objectAtIndex:1];
+        [Parse setApplicationId:appId clientKey:clientKey];
+        
+        #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
+        UIUserNotificationType UserNotificationTypes = UIUserNotificationTypeNone;
+        #endif
+        UIRemoteNotificationType notificationTypes = UIRemoteNotificationTypeNone;
+        
+        notificationTypes |= UIRemoteNotificationTypeNewsstandContentAvailability;
+        #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
+        UserNotificationTypes |= UIUserNotificationActivationModeBackground;
+        #endif
+        
+        if (notificationTypes == UIRemoteNotificationTypeNone)
+            NSLog(@"PushPlugin.register: Push notification type is set to none");
+        
+        isInline = NO;
+        
+        #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
+        if ([[UIApplication sharedApplication]respondsToSelector:@selector(registerUserNotificationSettings:)]) {
+            UIUserNotificationSettings *settings = [UIUserNotificationSettings settingsForTypes:UserNotificationTypes categories:nil];
+            [[UIApplication sharedApplication] registerUserNotificationSettings:settings];
+            [[UIApplication sharedApplication] registerForRemoteNotifications];
+        } else {
+            [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
+             (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+        }
+        #else
+        [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
+         (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
+        #endif
+        
+        if (notificationMessage) {            // if there is a pending startup notification
+            [self notificationReceived];    // go ahead and process it
+        }
+    }];
+}
+
+- (void)unregister:(CDVInvokedUrlCommand*)command;
+{
+    self.callbackId = command.callbackId;
+    
+    [[UIApplication sharedApplication] unregisterForRemoteNotifications];
+    [self successWithMessage:@"unregistered"];
 }
 
 - (void)getInstallationId:(CDVInvokedUrlCommand*) command
@@ -33,7 +82,6 @@
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
 }
-
 - (void)getInstallationObjectId:(CDVInvokedUrlCommand*) command
 {
     [self.commandDelegate runInBackground:^{
@@ -44,14 +92,12 @@
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
 }
-
 - (void)getSubscriptions: (CDVInvokedUrlCommand *)command
 {
     NSArray *channels = [PFInstallation currentInstallation].channels;
     CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsArray:channels];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
-
 - (void)subscribe: (CDVInvokedUrlCommand *)command
 {
     CDVPluginResult* pluginResult = nil;
@@ -72,98 +118,6 @@
     [currentInstallation saveInBackground];
     pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-}*/
-
-- (void)unregister:(CDVInvokedUrlCommand*)command;
-{
-    self.callbackId = command.callbackId;
-    
-    [[UIApplication sharedApplication] unregisterForRemoteNotifications];
-    [self successWithMessage:@"unregistered"];
-}
-
-- (void)init:(CDVInvokedUrlCommand*)command;
-{
-    [self.commandDelegate runInBackground:^ {
-        
-        NSLog(@"Push Plugin register called");
-        self.callbackId = command.callbackId;
-        
-        NSMutableDictionary* options = [command.arguments objectAtIndex:0];
-        NSMutableDictionary* iosOptions = [options objectForKey:@"ios"];
-        NSMutableDictionary* parseOptions = [options objectForKey:@"parse"];
-        
-        id appId = [parseOptions objectForKey:@"appId"];
-        id clientKey = [parseOptions objectForKey:@"clientKey"];
-        
-        if ([appId isKindOfClass:[NSString class]] && [clientKey isKindOfClass:[NSString class]]) {
-            [Parse setApplicationId:appId clientKey:clientKey];
-            NSLog(@"Parse Initialized.");
-        } else {
-            NSLog(@"No Parse configuration detected.");
-        }
-        
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
-        UIUserNotificationType UserNotificationTypes = UIUserNotificationTypeNone;
-#endif
-        UIRemoteNotificationType notificationTypes = UIRemoteNotificationTypeNone;
-        
-        id badgeArg = [iosOptions objectForKey:@"badge"];
-        id soundArg = [iosOptions objectForKey:@"sound"];
-        id alertArg = [iosOptions objectForKey:@"alert"];
-        
-        if (([badgeArg isKindOfClass:[NSString class]] && [badgeArg isEqualToString:@"true"]) || [badgeArg boolValue])
-        {
-            notificationTypes |= UIRemoteNotificationTypeBadge;
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
-            UserNotificationTypes |= UIUserNotificationTypeBadge;
-#endif
-        }
-        
-        if (([soundArg isKindOfClass:[NSString class]] && [soundArg isEqualToString:@"true"]) || [soundArg boolValue])
-        {
-            notificationTypes |= UIRemoteNotificationTypeSound;
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
-            UserNotificationTypes |= UIUserNotificationTypeSound;
-#endif
-        }
-        
-        if (([alertArg isKindOfClass:[NSString class]] && [alertArg isEqualToString:@"true"]) || [alertArg boolValue])
-        {
-            notificationTypes |= UIRemoteNotificationTypeAlert;
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
-            UserNotificationTypes |= UIUserNotificationTypeAlert;
-#endif
-        }
-        
-        notificationTypes |= UIRemoteNotificationTypeNewsstandContentAvailability;
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
-        UserNotificationTypes |= UIUserNotificationActivationModeBackground;
-#endif
-        
-        if (notificationTypes == UIRemoteNotificationTypeNone)
-            NSLog(@"PushPlugin.register: Push notification type is set to none");
-        
-        isInline = NO;
-        
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
-        if ([[UIApplication sharedApplication]respondsToSelector:@selector(registerUserNotificationSettings:)]) {
-            UIUserNotificationSettings *settings = [UIUserNotificationSettings settingsForTypes:UserNotificationTypes categories:nil];
-            [[UIApplication sharedApplication] registerUserNotificationSettings:settings];
-            [[UIApplication sharedApplication] registerForRemoteNotifications];
-        } else {
-            [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
-             (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
-        }
-#else
-        [[UIApplication sharedApplication] registerForRemoteNotificationTypes:
-         (UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert)];
-#endif
-        
-        if (notificationMessage)            // if there is a pending startup notification
-            [self notificationReceived];    // go ahead and process it
-        
-    }];
 }
 
 - (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
@@ -179,13 +133,13 @@
                        stringByReplacingOccurrencesOfString: @" " withString: @""];
     [results setValue:token forKey:@"deviceToken"];
     
-#if !TARGET_IPHONE_SIMULATOR
+    #if !TARGET_IPHONE_SIMULATOR
     // Get Bundle Info for Remote Registration (handy if you have more than one app)
     [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleDisplayName"] forKey:@"appName"];
     [results setValue:[[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"] forKey:@"appVersion"];
     
     // Check what Notifications the user has turned on.  We registered for all three, but they may have manually disabled some or all of them.
-#define SYSTEM_VERSION_LESS_THAN(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
+    #define SYSTEM_VERSION_LESS_THAN(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
     
     NSUInteger rntypes;
     if (!SYSTEM_VERSION_LESS_THAN(@"8.0")) {
@@ -223,13 +177,10 @@
     [results setValue:dev.model forKey:@"deviceModel"];
     [results setValue:dev.systemVersion forKey:@"deviceSystemVersion"];
     
-    // Send result to trigger 'registration' event but keep callback
-    NSMutableDictionary* message = [NSMutableDictionary dictionaryWithCapacity:1];
-    [message setObject:token forKey:@"registrationId"];
-    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:message];
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:token];
     [pluginResult setKeepCallbackAsBool:YES];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
-#endif
+    #endif
 }
 
 - (void)didFailToRegisterForRemoteNotificationsWithError:(NSError *)error
@@ -245,11 +196,9 @@
 - (void)notificationReceived {
     NSLog(@"Notification received");
     
-    if (notificationMessage && self.callbackId != nil)
-    {
+    if (notificationMessage && self.notificationCallbackId != nil) {
         NSMutableDictionary* message = [NSMutableDictionary dictionaryWithCapacity:4];
         NSMutableDictionary* additionalData = [NSMutableDictionary dictionaryWithCapacity:4];
-        
         
         for (id key in notificationMessage) {
             if ([key isEqualToString:@"aps"]) {
@@ -303,7 +252,7 @@
         // send notification message
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:message];
         [pluginResult setKeepCallbackAsBool:YES];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:self.notificationCallbackId];
         
         self.notificationMessage = nil;
     }
@@ -348,10 +297,10 @@
 
 @end
 
+@implementation AppDelegate (notification)
+
 static char launchNotificationKey;
-
-@implementation AppDelegate (CDVParsePlugin)
-
+ 
 - (id) getCommandInstance:(NSString*)className
 {
     return [self.viewController getCommandInstance:className];
@@ -391,18 +340,17 @@ static char launchNotificationKey;
 }
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
+    CDVParsePlugin *pushHandler = [self getCommandInstance:@"ParsePushPlugin"];
+    [pushHandler didRegisterForRemoteNotificationsWithDeviceToken:deviceToken];
+    
     // Store the deviceToken in the current installation and save it to Parse.
     PFInstallation *currentInstallation = [PFInstallation currentInstallation];
     [currentInstallation setDeviceTokenFromData:deviceToken];
     [currentInstallation saveInBackground];
-    
-    CDVParsePlugin *pushHandler = [self getCommandInstance:@"PushNotification"];
-    [pushHandler didRegisterForRemoteNotificationsWithDeviceToken:deviceToken];
-
 }
 
 - (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
-    CDVParsePlugin *pushHandler = [self getCommandInstance:@"PushNotification"];
+    CDVParsePlugin *pushHandler = [self getCommandInstance:@"ParsePushPlugin"];
     [pushHandler didFailToRegisterForRemoteNotificationsWithError:error];
 }
 
@@ -416,7 +364,7 @@ static char launchNotificationKey;
     }
     
     if (appState == UIApplicationStateActive) {
-        CDVParsePlugin *pushHandler = [self getCommandInstance:@"PushNotification"];
+        CDVParsePlugin *pushHandler = [self getCommandInstance:@"ParsePushPlugin"];
         pushHandler.notificationMessage = userInfo;
         pushHandler.isInline = YES;
         [pushHandler notificationReceived];
@@ -434,7 +382,7 @@ static char launchNotificationKey;
     application.applicationIconBadgeNumber = 0;
     
     if (self.launchNotification) {
-        CDVParsePlugin *pushHandler = [self getCommandInstance:@"PushNotification"];
+        CDVParsePlugin *pushHandler = [self getCommandInstance:@"ParsePushPlugin"];
         pushHandler.isInline = NO;
         pushHandler.notificationMessage = self.launchNotification;
         self.launchNotification = nil;

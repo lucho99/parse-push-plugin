@@ -1,12 +1,13 @@
+#import <Foundation/Foundation.h>
 #import <Cordova/CDV.h>
+#import <Cordova/CDVPlugin.h>
 #import "AppDelegate.h"
 
 @interface CDVParsePlugin: CDVPlugin
 {
     NSDictionary *notificationMessage;
-    BOOL    isInline;
+    BOOL isInline;
     NSString *notificationCallbackId;
-    NSString *callback;
     
     BOOL ready;
 }
@@ -16,11 +17,14 @@
 @property (nonatomic, copy) NSString *callback;
 
 @property (nonatomic, strong) NSDictionary *notificationMessage;
-@property BOOL                          isInline;
+@property BOOL isInline;
 
-
-- (void)init:(CDVInvokedUrlCommand*)command;
-- (void)unregister:(CDVInvokedUrlCommand*)command;
+- (void)initialize: (CDVInvokedUrlCommand*)command;
+- (void)getInstallationId: (CDVInvokedUrlCommand*)command;
+- (void)getInstallationObjectId: (CDVInvokedUrlCommand*)command;
+- (void)getSubscriptions: (CDVInvokedUrlCommand *)command;
+- (void)subscribe: (CDVInvokedUrlCommand *)command;
+- (void)unsubscribe: (CDVInvokedUrlCommand *)command;
 
 - (void)didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken;
 - (void)didFailToRegisterForRemoteNotificationsWithError:(NSError *)error;
@@ -28,16 +32,10 @@
 - (void)setNotificationMessage:(NSDictionary *)notification;
 - (void)notificationReceived;
 
-/*- (void)initialize: (CDVInvokedUrlCommand*)command;
-- (void)getInstallationId: (CDVInvokedUrlCommand*)command;
-- (void)getInstallationObjectId: (CDVInvokedUrlCommand*)command;
-- (void)getSubscriptions: (CDVInvokedUrlCommand *)command;
-- (void)subscribe: (CDVInvokedUrlCommand *)command;
-- (void)unsubscribe: (CDVInvokedUrlCommand *)command;*/
-
 @end
 
-@interface AppDelegate (CDVParsePlugin)
+@interface AppDelegate (notification)
+
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken;
 - (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error;
 - (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo;
